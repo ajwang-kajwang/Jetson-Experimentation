@@ -1,42 +1,87 @@
-class BaselineInferenceEngine:
+# baseline/inference_engine.py
+"""
+Core inference engine - handles YOLO model operations
+This is the ONLY file that directly interacts with YOLO
+"""
+import time
+import numpy as np
+from ultralytics import YOLO
+from typing import Dict, Any, Optional
+from pathlib import Path
+
+class InferenceEngine:
     """
-    Enhanced wrapper that uses the modular components
-    while maintaining compatibility with original functions
+    Wrapper for YOLO model operations
+    Separation of Concern: Model loading and inference ONLY
     """
     
-    def __init__(self, config: Optional[Config] = None):
-        self.config = config or Config()
+    def __init__(self, model_path: str, device: int = 0):
+        """Initialize with model path"""
+        self.model_path = model_path
+        self.device = device
         self.model = None
-        self.collector = MetricsCollector(self.config.WARMUP_FRAMES)
-        self.visualizer = Visualizer()
-        self.analyzer = PerformanceAnalyzer()
         
-    def run_live_inference(self, camera_index: Optional[int] = None,
-                          metrics_out: str = 'baseline_live_metrics.json') -> Dict:
-        """Run live inference using class structure"""
-        camera_index = camera_index or self.config.CAMERA_INDEX
-        
-        # Use the original function with classes enabled
-        infer_live(camera_index, metrics_out, use_classes=True)
-        
-        # Load and return metrics
-        with open(metrics_out, 'r') as f:
-            return json.load(f)
+    def load_model(self):
+        """Load YOLO model"""
+        print(f"Loading model from: {self.model_path}")
+        self.model = YOLO(self.model_path)
+        print("Model loaded successfully")
+        return self.model
     
-    def run_coco_validation(self, metrics_out: str = 'baseline_coco_metrics.json') -> Dict:
-        """Run COCO validation"""
-        return infer_coco(metrics_out)
+    def predict_frame(self, frame, img_size: int = 640) -> tuple:
+        """
+        Run inference on single frame
+        Returns: (results, latency_ms)
+        """
+        if self.model is None:
+            self.load_model()
+            
+        t_start = time.perf_counter()
+        results = self.model.predict(
+            source=frame,
+            imgsz=img_size,
+            verbose=False,
+            device=self.device
+        )
+        t_end = time.perf_counter()
+        
+        latency_ms = (t_end - t_start) * 1000.0
+        
+        return results, latency_ms
     
-    def print_system_info(self):
-        """Print system information"""
-        import torch
-        print("=" * 60)
-        print("SYSTEM INFORMATION")
-        print("=" * 60)
-        print(f"Model: {self.config.MODEL_PT}")
-        print(f"Image Size: {self.config.IMG_SIZE}")
-        print(f"PyTorch: {torch.__version__}")
-        print(f"CUDA Available: {torch.cuda.is_available()}")
-        if torch.cuda.is_available():
-            print(f"GPU: {torch.cuda.get_device_name(0)}")
-        print("=" * 60)
+    def validate_coco(self, data_yaml: str, img_size: int = 640) -> Dict:
+        """
+        Run COCO validation
+        Returns: metrics dictionary
+        """
+        if self.model is None:
+            self.load_model()
+            
+        print("Running COCO validation...")
+        t0 = time.perf_counter()
+        results = self.model.val(
+            data=data_yaml,
+            imgsz=img_size,
+            device=self.device,
+            verbose=False
+        )
+        t1 = time.perf_counter()
+        
+        # Extract metrics (implementation from original)
+        total_time = t1 - t0
+        
+        return {
+            'results': results,
+            'total_time_s': total_time,
+            'latency_ms': total_time * 1000.0
+        }
+    
+    def get_model_info(self) -> Dict:
+        """Get model information"""
+        if self.model is None:
+            return {'error': 'Model not loaded'}
+        
+        return {
+            'model_path': str(self.model_path),
+            'model_type': self.model.__class__.__name__,
+        }
