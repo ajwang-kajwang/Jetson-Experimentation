@@ -1,10 +1,10 @@
-
+# baseline/visualizer.py
 import cv2
-# ============================================================================
-# VISUALIZATION HANDLER
-# ============================================================================
+import numpy as np
+from typing import Dict
+
 class Visualizer:
-    """Handles all visualization and display tasks"""
+    """Handles visualization and display"""
     
     def __init__(self, window_name: str = "PyTorch YOLOv8 (Baseline)"):
         self.window_name = window_name
@@ -20,34 +20,24 @@ class Visualizer:
                     warming_up: bool = False) -> np.ndarray:
         """Draw metrics overlay on frame"""
         annotated = frame.copy()
-        y_offset = 30
         
-        # Frame counter
-        cv2.putText(annotated, f"Frame: {stats.get('frame_count', 0)}", 
-                   (10, y_offset), self.font, 0.6, self.colors['white'], 2)
-        y_offset += 25
+        # Match original simple display
+        if 'current_latency' in stats and 'fps_smooth' in stats:
+            text = f"Latency: {stats['current_latency']:.1f} ms  FPS: {stats['fps_smooth']:.1f}"
+            cv2.putText(annotated, text, (10, 30), 
+                       self.font, 0.9, self.colors['green'], 2, cv2.LINE_AA)
         
-        # Current latency (if available)
-        if 'current_latency' in stats:
-            cv2.putText(annotated, f"Latency: {stats['current_latency']:.1f} ms", 
-                       (10, y_offset), self.font, 0.6, self.colors['green'], 2)
-            y_offset += 25
-        
-        # FPS
-        cv2.putText(annotated, f"FPS: {stats.get('fps_smooth', 0):.1f}", 
-                   (10, y_offset), self.font, 0.6, self.colors['green'], 2)
-        y_offset += 25
-        
-        # Rolling statistics
+        # Add enhanced metrics below
+        y_offset = 60
         if 'mean_latency' in stats:
             cv2.putText(annotated, f"Mean: {stats['mean_latency']:.1f} ms", 
                        (10, y_offset), self.font, 0.6, self.colors['yellow'], 2)
             y_offset += 25
             
-            cv2.putText(annotated, f"P95: {stats['p95_latency']:.1f} ms", 
-                       (10, y_offset), self.font, 0.6, self.colors['yellow'], 2)
+            if 'p95_latency' in stats:
+                cv2.putText(annotated, f"P95: {stats['p95_latency']:.1f} ms", 
+                           (10, y_offset), self.font, 0.6, self.colors['yellow'], 2)
         
-        # Warmup indicator
         if warming_up:
             h, w = annotated.shape[:2]
             cv2.putText(annotated, "WARMING UP...", 
