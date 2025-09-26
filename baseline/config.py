@@ -14,7 +14,7 @@ LAB_DIR = Path.cwd()  # or Path('/workspace') inside container
 LAB_DIR.mkdir(exist_ok=True, parents=True)
 
 # Model and I/O
-MODEL_PT = '../Lab4/yolov8x.pt'  # Path to model weights
+MODEL_PT = 'C:/Users/kajwa/Development/embeddedAI/Lab_5/yolov8x.pt'  # Path to model weights
 IMG_SIZE = 640
 BATCH = 1
 DYNAMIC = False

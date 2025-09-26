@@ -85,7 +85,6 @@ class MetricsCollector:
     def get_final_metrics(self) -> Dict:
         """
         Calculate final metrics
-        Matches original output format
         """
         if not self.latencies:
             return {}

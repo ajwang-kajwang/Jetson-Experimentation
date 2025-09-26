@@ -4,10 +4,8 @@ Core inference engine - handles YOLO model operations
 This is the ONLY file that directly interacts with YOLO
 """
 import time
-import numpy as np
 from ultralytics import YOLO
-from typing import Dict, Any, Optional
-from pathlib import Path
+from typing import Dict
 
 class InferenceEngine:
     """
@@ -67,7 +65,7 @@ class InferenceEngine:
         )
         t1 = time.perf_counter()
         
-        # Extract metrics (implementation from original)
+        # Extract metrics 
         total_time = t1 - t0
         
         return {

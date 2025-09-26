@@ -1,7 +1,7 @@
 # baseline/run_baseline.py
 """
 Alternative entry point for running baseline tests
-This is OPTIONAL - provides a cleaner interface for development
+Cleaner interface for development
 """
 import sys
 from pathlib import Path

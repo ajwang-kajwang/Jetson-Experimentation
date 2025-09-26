@@ -10,7 +10,7 @@ import argparse
 import json
 from pathlib import Path
 
-# Import configuration (original style for compatibility)
+# Import configuration 
 from config import (
     MODEL_PT, IMG_SIZE, CAMERA_INDEX, DATA_YAML,
     EnhancedConfig
@@ -24,12 +24,11 @@ from performance_analyzer import PerformanceAnalyzer
 
 def infer_live(camera_index, metrics_out='baseline_live_metrics.json'):
     """
-    Live inference function - EXACT signature as original
-    This is what the instructor expects to work
+    Live inference function 
     """
     # Initialize components
     engine = InferenceEngine(MODEL_PT)
-    collector = MetricsCollector(warmup_frames=0)  # No warmup in original
+    collector = MetricsCollector(warmup_frames=0)  
     visualizer = Visualizer()
     
     # Load model
@@ -87,7 +86,7 @@ def infer_live(camera_index, metrics_out='baseline_live_metrics.json'):
 
 def infer_coco(metrics_out='baseline_coco_metrics.json'):
     """
-    COCO validation - EXACT signature as original
+    COCO validation
     """
     engine = InferenceEngine(MODEL_PT)
     
@@ -115,7 +114,7 @@ def infer_coco(metrics_out='baseline_coco_metrics.json'):
             'p95_latency_ms': float(val_results['latency_ms']),
             'fps': 1000.0 / val_results['latency_ms']
         }
-    except:
+    except AttributeError:
         metrics = {'error': 'Could not extract metrics'}
     
     print(metrics)
@@ -161,7 +160,7 @@ def infer_enhanced(mode='live', camera_index=None, metrics_out=None):
     
     return metrics
 
-# Main entry point - EXACTLY as instructor expects
+# Main entry point 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--mode', choices=['live', 'coco'], default='coco')
