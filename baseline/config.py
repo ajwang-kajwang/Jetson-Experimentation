@@ -15,7 +15,7 @@ BASE_DIR = Path(__file__).parent
 # Model and I/O
 MODEL_PT = str(LAB_DIR / 'yolov8x.pt')  
 IMG_SIZE = 640
-BATCH = 1
+BATCH = 1   
 DYNAMIC = False
 HALF = False
 

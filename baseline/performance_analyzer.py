@@ -1,7 +1,6 @@
 # baseline/performance_analyzer.py
 """
 Performance analysis and insights generation
-Separation of Concern: Metrics interpretation ONLY
 """
 from typing import Dict, List
 

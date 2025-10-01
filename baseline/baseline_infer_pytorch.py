@@ -8,7 +8,7 @@ import numpy as np
 import cv2
 import argparse
 import json
-from pathlib import Path
+
 
 # Import configuration 
 from config import (

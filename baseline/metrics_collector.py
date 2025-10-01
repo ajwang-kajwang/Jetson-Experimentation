@@ -1,7 +1,6 @@
 # baseline/metrics_collector.py
 """
 Metrics collection and calculation
-Separation of Concern: Data collection and statistics ONLY
 """
 import time
 import numpy as np
