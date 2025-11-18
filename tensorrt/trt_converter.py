@@ -1,107 +1,122 @@
-# trt_converter.py
 """
-Converts PyTorch YOLO models to TensorRT engines using ONNX intermediate format
+TensorRT converter for YOLO models
+Converts .pt or .onnx to .engine
 """
 import tensorrt as trt
 from pathlib import Path
-from typing import Optional, Tuple
-from ultralytics import YOLO
-
-# Import from baseline
-import sys
-sys.path.append(str(Path(__file__).parent.parent))
-from baseline import config
 
 
-class TensorRTConverter:
+def convert_onnx_to_engine(onnx_path, engine_path, fp16=True):
     """
-    Convert PyTorch model to TensorRT    
+    Convert ONNX model to TensorRT engine
+    Args:
+        onnx_path: Path to ONNX model
+        engine_path: Output engine path
+        fp16: Use FP16 precision
     """
+    logger = trt.Logger(trt.Logger.INFO)
+    builder = trt.Builder(logger)
+    config = builder.create_builder_config()
     
-    def __init__(self, precision: str = "FP16"):
-        self.precision = precision
-        self.logger = trt.Logger(trt.Logger.WARNING)
-        
-        # Use config paths
-        self.model_path = config.MODEL_PT
-        self.img_size = config.IMG_SIZE
-        
-        # Select paths based on precision 
-        if precision == "FP16":
-            self.onnx_path = config.ONNX_PATH_FP16
-            self.engine_path = config.ENGINE_PATH_FP16
-        else:
-            self.onnx_path = config.ONNX_PATH
-            self.engine_path = config.ENGINE_PATH
-            
-    def export_to_onnx(self) -> Path:
-        """Step 1: Export PyTorch to ONNX"""
-        print(f"Exporting {self.model_path} to ONNX...")
-        model = YOLO(self.model_path)
-        
-        model.export(
-            format='onnx',
-            imgsz=self.img_size,
-            simplify=True,
-            half=(self.precision == "FP16")
-        )
-        
-        print(f"ONNX saved to {self.onnx_path}")
-        return self.onnx_path
+    # Set max workspace size (4GB)
+    config.max_workspace_size = 4 * (1 << 30)
     
-    def build_engine(self) -> Optional[Path]:
-        """ Build TensorRT engine from ONNX"""
-        print(f"Building TensorRT engine...")
-        
-        builder = trt.Builder(self.logger)
-        config = builder.create_builder_config()
-        config.max_workspace_size = 4 * (1 << 30)  # 4GB
-        
-        # Set precision flag
-        if self.precision == "FP16" and builder.platform_has_fast_fp16:
-            config.set_flag(trt.BuilderFlag.FP16)
-        
-        # Parse ONNX
-        network = builder.create_network(
-            1 << int(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH)
-        )
-        parser = trt.OnnxParser(network, self.logger)
-        
-        with open(self.onnx_path, 'rb') as f:
-            if not parser.parse(f.read()):
-                return None
-        
-        # Build and save engine
-        engine = builder.build_engine(network, config)
-        if engine:
-            with open(self.engine_path, 'wb') as f:
-                f.write(engine.serialize())
-            print(f"Engine saved to {self.engine_path}")
-            return self.engine_path
-        return None
+    # Enable FP16 if requested
+    if fp16 and builder.platform_has_fast_fp16:
+        config.set_flag(trt.BuilderFlag.FP16)
+        print("Using FP16 precision")
     
-    def convert(self) -> Tuple[bool, Path]:
-        """Complete conversion pipeline"""
-        try:
-            self.export_to_onnx()
-            result = self.build_engine()
-            return (True, result) if result else (False, None)
-        except Exception as e:
-            print(f"Conversion failed: {e}")
-            return False, None
+    # Parse ONNX
+    network = builder.create_network(
+        1 << int(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH)
+    )
+    parser = trt.OnnxParser(network, logger)
+    
+    print(f"Parsing ONNX model: {onnx_path}")
+    with open(onnx_path, 'rb') as f:
+        if not parser.parse(f.read()):
+            print("Failed to parse ONNX model")
+            for error in range(parser.num_errors):
+                print(parser.get_error(error))
+            return False
+    
+    # Build engine
+    print("Building TensorRT engine... This may take a few minutes")
+    engine = builder.build_engine(network, config)
+    
+    if engine is None:
+        print("Failed to build engine")
+        return False
+    
+    # Save engine
+    with open(engine_path, 'wb') as f:
+        f.write(engine.serialize())
+    
+    print(f"Engine saved to: {engine_path}")
+    print(f"Engine size: {Path(engine_path).stat().st_size / 1e6:.1f} MB")
+    return True
 
 
-if __name__ == '__main__':
+def convert_pt_to_engine(pt_path, engine_path, fp16=True):
+    """
+    Convert PyTorch model to TensorRT engine via ONNX
+    Args:
+        pt_path: Path to .pt model
+        engine_path: Output engine path
+        fp16: Use FP16 precision
+    """
+    try:
+        from ultralytics import YOLO
+    except ImportError:
+        print("ultralytics not installed. Install with: pip install ultralytics")
+        return False
+    
+    # Export to ONNX first
+    print(f"Loading PyTorch model: {pt_path}")
+    model = YOLO(pt_path)
+    
+    onnx_path = Path(pt_path).with_suffix('.onnx')
+    print(f"Exporting to ONNX: {onnx_path}")
+    
+    model.export(format='onnx', imgsz=640, simplify=True, half=fp16)
+    
+    # Convert ONNX to TensorRT
+    return convert_onnx_to_engine(onnx_path, engine_path, fp16)
+
+
+if __name__ == "__main__":
     import argparse
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--precision', default='FP16', choices=['FP32', 'FP16'])
+    
+    parser = argparse.ArgumentParser(description='Convert model to TensorRT')
+    parser.add_argument('model', type=str, help='Input model (.pt or .onnx)')
+    parser.add_argument('--output', type=str, help='Output engine path')
+    parser.add_argument('--fp32', action='store_true', help='Use FP32 (default: FP16)')
+    
     args = parser.parse_args()
     
-    converter = TensorRTConverter(args.precision)
-    success, engine_path = converter.convert()
-    
-    if success:
-        print(f"✓ Success: {engine_path}")
-    else:
-        print("✗ Failed")
+    # Check input exists
+    model_path = Path(args.model)
+    if not model_path.exists():
+        print(f"Model not found: {model_path}")
         exit(1)
+    
+    # Determine output path
+    if args.output:
+        engine_path = Path(args.output)
+    else:
+        precision = 'fp32' if args.fp32 else 'fp16'
+        engine_path = model_path.with_name(f"{model_path.stem}_{precision}.engine")
+    
+    # Convert based on file type
+    use_fp16 = not args.fp32
+    
+    if model_path.suffix == '.onnx':
+        success = convert_onnx_to_engine(model_path, engine_path, use_fp16)
+    elif model_path.suffix == '.pt':
+        success = convert_pt_to_engine(model_path, engine_path, use_fp16)
+    else:
+        print(f"Unsupported model format: {model_path.suffix}")
+        print("Supported: .pt (PyTorch) or .onnx")
+        exit(1)
+    
+    exit(0 if success else 1)

@@ -8,5 +8,12 @@ baseline/__pycache__/config.cpython-313.pyc
 baseline/__pycache__/metrics_collector.cpython-313.pyc
 baseline/__pycache__/performance_analyzer.cpython-313.pyc
 tensorrt/task1_
-
-
+baseline/__pycache__/    
+yolo_env
+.venv
+livestock_deepstream/yolo11n.pt
+livestock_deepstream/config_infer_livestock.txt
+livestock_deepstream/labels.txt
+livestock_deepstream/metrics.html
+livestock_deepstream/yolo11n.onnx
+deepstream/setup_deepstream.sh

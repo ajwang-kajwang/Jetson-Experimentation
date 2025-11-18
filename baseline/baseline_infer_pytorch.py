@@ -11,20 +11,22 @@ import json
 
 
 # Import configuration 
-from config import (
+from baseline.config import (
     MODEL_PT, IMG_SIZE, CAMERA_INDEX, DATA_YAML,
     EnhancedConfig  
 )
 
 # Import modules
-from inference_engine import InferenceEngine
-from metrics_collector import MetricsCollector
-from visualizer import Visualizer
-from performance_analyzer import PerformanceAnalyzer
+from baseline.inference_engine import InferenceEngine
+from baseline.metrics_collector import MetricsCollector
+from baseline.visualizer import Visualizer
+from baseline.performance_analyzer import PerformanceAnalyzer
 
-def infer_live(camera_index, metrics_out='baseline_live_metrics.json'):
+def infer_live(camera_source, metrics_out='baseline_live_metrics.json'):
     """
     Live inference function 
+    Args:
+        camera_source: int for local camera or str for IP stream URL
     """
     # Initialize components
     engine = InferenceEngine(MODEL_PT)
@@ -34,19 +36,31 @@ def infer_live(camera_index, metrics_out='baseline_live_metrics.json'):
     # Load model
     engine.load_model()
     
-    # Open camera
-    cap = cv2.VideoCapture(camera_index)
-    if not cap.isOpened():
-        raise RuntimeError('Camera not available')
+    # Open camera/stream
+    cap = cv2.VideoCapture(camera_source)
     
-    print(f"Starting live inference on camera {camera_index}")
+    # For IP streams, reduce buffer to minimize latency
+    if isinstance(camera_source, str):
+        cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+    
+    if not cap.isOpened():
+        raise RuntimeError(f'Cannot open source: {camera_source}')
+    
+    source_type = "IP Stream" if isinstance(camera_source, str) else f"Camera {camera_source}"
+    print(f"Starting live inference on {source_type}")
     print("Press ESC to stop...")
     
     try:
         while True:
             ok, frame = cap.read()
-            if not ok:
-                break
+            if not ok or frame is None:
+                print("Failed to read frame, retrying...")
+                time.sleep(0.1)
+                continue
+
+            if frame.size == 0:
+                print("Empty frame received")
+                continue
             
             # Run inference
             results, latency_ms = engine.predict_frame(frame, IMG_SIZE)
@@ -164,7 +178,8 @@ def infer_enhanced(mode='live', camera_index=None, metrics_out=None):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--mode', choices=['live', 'coco'], default='coco')
-    parser.add_argument('--camera', type=int, default=CAMERA_INDEX)
+    parser.add_argument('--camera', type=str, default=str(CAMERA_INDEX),
+                       help='Camera index (0) or IP stream URL (http://...)')
     parser.add_argument('--metrics_out', type=str, default=None)
     parser.add_argument('--enhanced', action='store_true', 
                        help='Use enhanced metrics and analysis')
@@ -174,10 +189,15 @@ if __name__ == '__main__':
         # Enhanced mode with full features
         infer_enhanced(args.mode, args.camera, args.metrics_out)
     else:
-        # Original mode - exactly as expected
+        # Original mode
         if args.mode == 'live':
             out = args.metrics_out or 'baseline_live_metrics.json'
-            infer_live(args.camera, metrics_out=out)
+            # Convert to int if numeric, otherwise keep as string
+            try:
+                camera = int(args.camera)
+            except ValueError:
+                camera = args.camera
+            infer_live(camera, metrics_out=out)
         else:
             out = args.metrics_out or 'baseline_coco_metrics.json'
             infer_coco(metrics_out=out)
